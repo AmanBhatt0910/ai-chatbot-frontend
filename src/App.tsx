@@ -1,10 +1,15 @@
-import './App.css'
+import AppRoutes from "./routes/AppRouter"
+import { Toaster } from "sonner";
 
 function App() {
-
   return (
     <>
-      <div className='text-blue-500'>Homepage</div>
+      <AppRoutes/>
+      <Toaster
+        position="top-right"
+        richColors
+        expand={true}
+      />
     </>
   )
 }
