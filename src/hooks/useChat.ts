@@ -13,9 +13,10 @@ export const useChat = () => {
     setMessages,
     activeConversation,
     setActiveConversation,
+    setTyping,
   } = useChatStore()
 
-  // 1. Fetch existing messages when conversation changes
+
   useEffect(() => {
     if (activeConversation === null) return
 
@@ -25,9 +26,8 @@ export const useChat = () => {
           `/api/conversations/${activeConversation}/messages`
         )
 
-        // normalize backend → frontend
         const normalized: Message[] = res.data.map((msg) => ({
-          id:  Number(msg.id),
+          id: Number(msg.id),
           conversationId: Number(msg.conversationId),
           senderId: String(msg.senderId),
           content: msg.content,
@@ -37,6 +37,7 @@ export const useChat = () => {
         }))
 
         setMessages(normalized)
+
       } catch (err) {
         console.error("Failed to fetch messages", err)
       }
@@ -46,45 +47,43 @@ export const useChat = () => {
 
   }, [activeConversation, setMessages])
 
-  // 2. WebSocket connection + subscription
+  // 🔥 WebSocket connection
   useEffect(() => {
-
     if (activeConversation === null) return
 
-    websocketService.connect(
-      (msg) => addMessage(msg),
-      () => {
-        websocketService.subscribeToConversation(
-          activeConversation,
-          (msg) => addMessage(msg)
-        )
-      }
-    )
+    websocketService.connect(() => {
+      websocketService.subscribeToConversation(
+        activeConversation,
+        (msg) => {
+          addMessage(msg)
+          if (msg.role === "AI") {
+            setTyping(false)
+          }
+        }
+      )
+    })
 
-  }, [activeConversation, addMessage])
-
-  // 3. Cleanup only on unmount
-  useEffect(() => {
     return () => {
       websocketService.disconnect()
     }
-  }, [])
 
-  // 4. Send message (optimistic UI)
+  }, [activeConversation])
+
+  // 🔥 Send message
   const sendMessage = (content: string) => {
     if (activeConversation === null) return
+
+    setTyping(true)
 
     const message: Message = {
       id: -Date.now(),
       conversationId: activeConversation,
-      senderId: "1",
+      senderId: "optimistic",
       content,
       role: "USER",
       createdAt: new Date().toISOString(),
       status: "SENDING",
     }
-
-    addMessage(message)
 
     websocketService.sendMessage(message)
   }

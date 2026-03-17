@@ -9,17 +9,24 @@ let subscription: StompSubscription | null = null
 export const websocketService = {
 
   connect: (
-    onMessage: (msg: Message) => void,
     onConnectCallback?: () => void
   ) => {
 
     if (stompClient?.connected) return stompClient
 
-    const socket = new SockJS(`${import.meta.env.VITE_API_BASE_URL}/ws`)
+    const token = localStorage.getItem("token")
+
+    const socket = new SockJS(
+      `${import.meta.env.VITE_API_BASE_URL}/ws?token=${token}`
+    )
 
     stompClient = new Client({
       webSocketFactory: () => socket,
       reconnectDelay: 5000,
+
+      connectHeaders: {
+        Authorization: `Bearer ${token}`,
+      },
 
       onConnect: () => {
         console.log("WebSocket connected")
@@ -74,11 +81,9 @@ export const websocketService = {
     stompClient.publish({
       destination: "/app/chat",
       body: JSON.stringify({
-        senderId: message.senderId,
-        conversationId: message.conversationId,
-        content: message.content,
-        type: message.role,
-      }),
+      conversationId: message.conversationId,
+      content: message.content,
+    })
     })
   },
 

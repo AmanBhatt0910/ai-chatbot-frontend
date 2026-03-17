@@ -9,7 +9,7 @@ interface ChatState {
   isTyping: boolean
 
   setConversations: (conversations: Conversation[]) => void
-  setActiveConversation: (id: number) => void
+  setActiveConversation: (id: number | null) => void
   setMessages: (messages: Message[]) => void
   addMessage: (message: Message) => void
   setTyping: (typing: boolean) => void
