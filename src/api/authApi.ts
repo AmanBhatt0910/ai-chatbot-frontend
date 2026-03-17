@@ -2,7 +2,7 @@ import api from "./axios"
 import type { AuthResponse } from "../types/AuthResponse"
 
 export const login = async (identifier: string, password: string) => {
-  const response = await api.post<AuthResponse>("/auth/login", {
+  const response = await api.post<AuthResponse>("/api/auth/login", {
     identifier,
     password,
   })
@@ -15,7 +15,7 @@ export const register = async (
   email: string,
   password: string
 ) => {
-  const response = await api.post<AuthResponse>("/auth/register", {
+  const response = await api.post<AuthResponse>("/api/auth/register", {
     username,
     email,
     password,

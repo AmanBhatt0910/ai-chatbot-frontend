@@ -1,8 +1,8 @@
 export type MessageRole = "USER" | "AI"
 
 export interface Message {
-  id: string
-  conversationId: string
+  id: number
+  conversationId: number
   senderId: string
   content: string
   role: MessageRole

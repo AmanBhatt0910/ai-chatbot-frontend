@@ -1,49 +1,33 @@
-import { useState } from "react"
-import { useChat } from "../hooks/useChat"
+import { useChat } from "@/hooks/useChat"
+import ChatLayout from "@/components/chat/ChatLayout"
+import ChatWindow from "@/components/chat/ChatWindow"
+import ChatInput from "@/components/chat/ChatInput"
 
 export default function ChatPage() {
 
-  const { messages, sendMessage } = useChat()
-  const [input, setInput] = useState("")
+  const {
+    messages,
+    sendMessage,
+    activeConversation,
+  } = useChat()
 
-  const handleSend = () => {
-    if (!input.trim()) return
-
-    sendMessage(input)
-    setInput("")
+  if (!activeConversation) {
+    return (
+      <ChatLayout>
+        <div className="flex items-center justify-center h-full text-muted-foreground">
+          Select or create a conversation
+        </div>
+      </ChatLayout>
+    )
   }
 
   return (
-    <div className="flex flex-col h-screen">
+    <ChatLayout>
 
-      <div className="flex-1 overflow-auto p-6 space-y-4">
+      <ChatWindow messages={messages} />
 
-        {messages.map((msg) => (
-          <div key={msg.id}>
-            <b>{msg.role}:</b> {msg.content}
-          </div>
-        ))}
+      <ChatInput onSend={sendMessage} />
 
-      </div>
-
-      <div className="border-t p-4 flex gap-2">
-
-        <input
-          className="flex-1 border rounded px-3 py-2"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Type a message..."
-        />
-
-        <button
-          onClick={handleSend}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded"
-        >
-          Send
-        </button>
-
-      </div>
-
-    </div>
+    </ChatLayout>
   )
 }
