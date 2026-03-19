@@ -28,6 +28,7 @@ export const useChatStore = create<ChatState>((set) => ({
     set({
       activeConversation: id,
       messages: [],
+      isTyping: false, // reset typing indicator on conversation switch
     }),
 
   setMessages: (messages) =>
@@ -35,30 +36,26 @@ export const useChatStore = create<ChatState>((set) => ({
 
   addMessage: (message) =>
     set((state) => {
-
-      // 1. Try to find matching optimistic message
+      // Replace matching optimistic message (same content + SENDING status)
       const existingIndex = state.messages.findIndex(
         (m) =>
-          m.senderId === message.senderId &&
+          m.status === "SENDING" &&
           m.content === message.content &&
-          m.status === "SENDING"
+          m.role === message.role
       )
 
-      // 2. If found → REPLACE it with backend message
       if (existingIndex !== -1) {
-        const updatedMessages = [...state.messages]
-        updatedMessages[existingIndex] = {
-          ...message,
-          status: "SENT",
-        }
-
-        return { messages: updatedMessages }
+        const updated = [...state.messages]
+        updated[existingIndex] = { ...message, status: "SENT" }
+        return { messages: updated }
       }
 
-      // 3. Otherwise → normal add (AI message etc.)
-      return {
-        messages: [...state.messages, message],
+      // Prevent duplicates for real messages (positive id)
+      if (message.id > 0 && state.messages.some((m) => m.id === message.id)) {
+        return state
       }
+
+      return { messages: [...state.messages, message] }
     }),
 
   setTyping: (typing) =>

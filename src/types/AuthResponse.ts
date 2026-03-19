@@ -1,8 +1,8 @@
 export interface AuthResponse {
   token: string
   user: {
-    id: string
-    email: string
+    id: number
     username: string
+    email: string
   }
 }

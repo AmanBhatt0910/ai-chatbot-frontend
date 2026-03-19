@@ -8,14 +8,16 @@ export default function ChatPage() {
   const {
     messages,
     sendMessage,
+    setCategory,
     activeConversation,
+    hasCategory,
   } = useChat()
 
   if (!activeConversation) {
     return (
       <ChatLayout>
         <div className="flex items-center justify-center h-full text-muted-foreground">
-          Select or create a conversation
+          Select or create a conversation 💬
         </div>
       </ChatLayout>
     )
@@ -23,11 +25,12 @@ export default function ChatPage() {
 
   return (
     <ChatLayout>
-
       <ChatWindow messages={messages} />
-
-      <ChatInput onSend={sendMessage} />
-
+      <ChatInput
+        onSend={sendMessage}
+        onSetCategory={setCategory}
+        hasCategory={hasCategory}
+      />
     </ChatLayout>
   )
 }

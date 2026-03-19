@@ -1,4 +1,4 @@
-export type MessageRole = "USER" | "AI"
+export type MessageRole = "USER" | "AI" | "SYSTEM"
 
 export interface Message {
   id: number

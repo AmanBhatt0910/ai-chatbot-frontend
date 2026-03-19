@@ -5,14 +5,25 @@ import type { Message } from "../types/Message"
 
 let stompClient: Client | null = null
 let subscription: StompSubscription | null = null
+let isConnecting = false
+let pendingSubscription: (() => void) | null = null
 
 export const websocketService = {
 
-  connect: (
-    onConnectCallback?: () => void
-  ) => {
+  connect: (onConnectCallback?: () => void) => {
+    // Already connected — run callback immediately
+    if (stompClient?.connected) {
+      onConnectCallback?.()
+      return stompClient
+    }
 
-    if (stompClient?.connected) return stompClient
+    // Mid-connection — queue the callback, don't create a second client
+    if (isConnecting) {
+      if (onConnectCallback) pendingSubscription = onConnectCallback
+      return stompClient
+    }
+
+    isConnecting = true
 
     const token = localStorage.getItem("token")
 
@@ -23,23 +34,29 @@ export const websocketService = {
     stompClient = new Client({
       webSocketFactory: () => socket,
       reconnectDelay: 5000,
-
       connectHeaders: {
         Authorization: `Bearer ${token}`,
       },
-
       onConnect: () => {
-        console.log("WebSocket connected")
+        console.log("✅ WebSocket connected")
+        isConnecting = false
         onConnectCallback?.()
+        if (pendingSubscription) {
+          pendingSubscription()
+          pendingSubscription = null
+        }
       },
-
+      onDisconnect: () => {
+        console.log("🔌 WebSocket disconnected")
+        isConnecting = false
+      },
       onStompError: (frame) => {
-        console.error("Broker error:", frame.headers["message"])
+        console.error("❌ Broker error:", frame.headers["message"])
+        isConnecting = false
       },
     })
 
     stompClient.activate()
-
     return stompClient
   },
 
@@ -47,50 +64,75 @@ export const websocketService = {
     conversationId: number,
     callback: (msg: Message) => void
   ) => {
-
-    if (!stompClient || !stompClient.connected) return
-
     if (subscription) {
       subscription.unsubscribe()
+      subscription = null
+    }
+
+    if (!stompClient?.connected) {
+      console.warn("⚠️ WS not connected — subscription skipped")
+      return
     }
 
     subscription = stompClient.subscribe(
       `/topic/conversations/${conversationId}`,
-      (message) => {
-
-        const raw = JSON.parse(message.body)
+      (frame) => {
+        const raw = JSON.parse(frame.body)
 
         const normalized: Message = {
-          id: Number(raw.id),
-          conversationId: Number(raw.conversationId),
-          senderId: String(raw.senderId),
+          id: Number(raw.id ?? 0),
+          conversationId: Number(raw.conversationId ?? conversationId),
+          senderId: String(raw.senderId ?? "system"),
           content: raw.content,
-          role: raw.type,
-          createdAt: raw.timestamp,
+          role: raw.type as Message["role"],
+          createdAt: raw.timestamp ?? new Date().toISOString(),
           status: "SENT",
         }
 
         callback(normalized)
       }
     )
+
+    console.log(`📡 Subscribed to conversation ${conversationId}`)
   },
 
-  sendMessage: (message: Message) => {
-    if (!stompClient || !stompClient.connected) return
+  sendMessage: (payload: {
+    conversationId: number
+    content: string
+    type: string
+  }) => {
+    if (!stompClient?.connected) {
+      console.error("❌ Cannot send — WebSocket not connected")
+      return
+    }
 
     stompClient.publish({
       destination: "/app/chat",
       body: JSON.stringify({
-      conversationId: message.conversationId,
-      content: message.content,
-    })
+        conversationId: payload.conversationId,
+        content: payload.content,
+        type: payload.type,
+      }),
     })
   },
 
+  // Unsubscribe from topic only — keeps WS alive for conversation switching
+  unsubscribe: () => {
+    if (subscription) {
+      subscription.unsubscribe()
+      subscription = null
+    }
+  },
+
+  // Full teardown — only call on logout
   disconnect: () => {
     subscription?.unsubscribe()
+    subscription = null
     stompClient?.deactivate()
     stompClient = null
-    subscription = null
+    isConnecting = false
+    pendingSubscription = null
   },
+
+  isConnected: () => stompClient?.connected ?? false,
 }
