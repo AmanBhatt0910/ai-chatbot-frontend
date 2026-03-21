@@ -63,7 +63,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
       }
       setConversations([newConv, ...conversations])
       setActiveConversation(newConv.id)
-      onClose() // close sidebar on mobile after creating chat
+      onClose()
     } catch (err) {
       console.error("Failed to create conversation", err)
     }
@@ -89,8 +89,12 @@ export default function Sidebar({ isOpen, onClose }: Props) {
 
   const handleSelectConversation = (id: number) => {
     setActiveConversation(id)
-    onClose() // close sidebar on mobile after selecting
+    onClose()
   }
+
+  // Safe display name — works whether user came from login response or /me reload
+  const displayName = user?.username ?? user?.email ?? "?"
+  const avatarInitial = displayName[0].toUpperCase()
 
   return (
     <>
@@ -106,10 +110,8 @@ export default function Sidebar({ isOpen, onClose }: Props) {
       {/* Sidebar panel */}
       <div
         className={cn(
-          // Base layout
           "fixed md:relative inset-y-0 left-0 z-30",
           "w-72 h-screen shrink-0 border-r flex flex-col bg-sidebar",
-          // Mobile: slide in/out
           "transition-transform duration-300 ease-in-out",
           "md:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full"
@@ -118,7 +120,6 @@ export default function Sidebar({ isOpen, onClose }: Props) {
         {/* Logo + mobile close button */}
         <div className="p-4 border-b border-border/40 flex items-center justify-between">
           <img src="/logo.png" alt="Logo" className="h-9 w-auto" />
-          {/* Close button — only visible on mobile */}
           <button
             onClick={onClose}
             className="md:hidden p-1.5 rounded-lg text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
@@ -176,7 +177,6 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                 )}
               >
-                {/* Active indicator */}
                 {isActive && (
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-primary rounded-r-full" />
                 )}
@@ -214,13 +214,13 @@ export default function Sidebar({ isOpen, onClose }: Props) {
             <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-muted/60 transition-colors group">
               <Avatar className="ring-2 ring-border/50 shrink-0">
                 <AvatarFallback className="bg-gradient-to-br from-slate-600 to-slate-800 text-white text-xs font-bold">
-                  {user.username[0].toUpperCase()}
+                  {avatarInitial}
                 </AvatarFallback>
               </Avatar>
 
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate text-foreground">
-                  {user.username}
+                  {displayName}
                 </div>
                 <div className="text-[11px] text-muted-foreground truncate">
                   {user.email}

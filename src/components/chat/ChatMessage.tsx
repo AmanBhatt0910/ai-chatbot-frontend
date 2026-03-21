@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useEffect, useState, useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { useAuthStore } from "@/store/authStore"
 
 interface Props {
   message: Message
@@ -92,7 +93,6 @@ function AnimatedAIBubble({ content }: { content: string }) {
     return () => {
       if (rafRef.current) clearTimeout(rafRef.current)
     }
-  // Run once on mount — content won't change for a live message
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -114,19 +114,21 @@ function BubbleContent({ message, isOwn, animate }: Props) {
   const isAI = !isOwn
 
   if (isAI) {
-    // Live response → word-by-word animation
     if (animate) return <AnimatedAIBubble content={message.content} />
-    // History → render markdown immediately, no hook, no flash
     return <MarkdownContent content={message.content} />
   }
 
-  // User message → plain text always
   return <p className="whitespace-pre-wrap wrap-break-word">{message.content}</p>
 }
 
 // ── Public component ─────────────────────────────────────────────────────────
 export default function ChatMessage({ message, isOwn, animate = false }: Props) {
   const isAI = !isOwn
+  const { user } = useAuthStore()
+
+  // Same safe fallback chain as Sidebar
+  const displayName = user?.username ?? user?.email ?? "?"
+  const avatarInitial = displayName[0].toUpperCase()
 
   return (
     <div
@@ -178,7 +180,7 @@ export default function ChatMessage({ message, isOwn, animate = false }: Props) 
       {isOwn && (
         <Avatar className="shrink-0 mt-0.5 ring-2 ring-primary/20 shadow-sm">
           <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-            U
+            {avatarInitial}
           </AvatarFallback>
         </Avatar>
       )}
