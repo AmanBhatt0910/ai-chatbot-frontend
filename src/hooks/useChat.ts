@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react"
+import { useEffect, useRef, useCallback, useState } from "react"
 import { useChatStore } from "../store/chatStore"
 import { websocketService } from "../services/websocketService"
 import type { Message } from "../types/Message"
@@ -17,7 +17,9 @@ export const useChat = () => {
     setTyping,
   } = useChatStore()
 
-  // Stable ref so WS callbacks always see the current conversation id
+  // True while fetching messages for a conversation — gates chip visibility
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+
   const activeConversationRef = useRef<number | null>(activeConversation)
   useEffect(() => {
     activeConversationRef.current = activeConversation
@@ -28,6 +30,7 @@ export const useChat = () => {
     if (activeConversation === null) return
 
     const fetchMessages = async () => {
+      setIsLoadingMessages(true)
       try {
         const res = await api.get<BackendMessage[]>(
           `/api/conversations/${activeConversation}/messages`
@@ -46,6 +49,8 @@ export const useChat = () => {
         setMessages(normalized)
       } catch (err) {
         console.error("Failed to fetch messages", err)
+      } finally {
+        setIsLoadingMessages(false)
       }
     }
 
@@ -56,18 +61,14 @@ export const useChat = () => {
   useEffect(() => {
     if (activeConversation === null) return
 
-    // ✅ StrictMode guard: track whether this effect instance is still active.
-    // React StrictMode fires mount → cleanup → mount in dev. Without this flag,
-    // both mount cycles subscribe, giving two listeners on the same topic.
     let active = true
 
     const subscribe = () => {
-      if (!active) return // cleanup already ran — don't subscribe
+      if (!active) return
 
       websocketService.subscribeToConversation(
         activeConversation,
         (msg: Message) => {
-          // Discard messages that arrived for an old conversation
           if (msg.conversationId !== activeConversationRef.current) return
 
           addMessage(msg)
@@ -87,7 +88,6 @@ export const useChat = () => {
 
     return () => {
       active = false
-      // Only drop the topic subscription — keep the WS connection alive
       websocketService.unsubscribe()
     }
   }, [activeConversation]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -164,17 +164,23 @@ export const useChat = () => {
         type: "USER",
       })
 
-      // Refresh sidebar title after backend confirms category
       setTimeout(() => refreshConversations(), 1200)
     },
     [] // eslint-disable-line react-hooks/exhaustive-deps
   )
 
-  // ── Derived: has a category been confirmed by the backend? ──────────────
-  // True once the backend sends the SYSTEM "Category set to: X" message
+  // ── Derived: category confirmed once SYSTEM message arrives ────────────
   const hasCategory = messages.some(
     (m) => m.role === "SYSTEM" && m.content.startsWith("Category set to:")
   )
+
+  // ── Derived: extract category name from SYSTEM message ─────────────────
+  const categoryMessage = messages.find(
+    (m) => m.role === "SYSTEM" && m.content.startsWith("Category set to:")
+  )
+  const activeCategory = categoryMessage
+    ? categoryMessage.content.replace("Category set to:", "").replace(". You can now ask questions.", "").trim()
+    : null
 
   return {
     messages,
@@ -184,5 +190,7 @@ export const useChat = () => {
     setActiveConversation,
     refreshConversations,
     hasCategory,
+    activeCategory,
+    isLoadingMessages, // ← consumed by ChatInput to gate chip visibility
   }
 }

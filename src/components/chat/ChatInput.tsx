@@ -2,25 +2,66 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { SendHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
+import api from "@/api/axios"
 
 interface Props {
   onSend: (message: string) => void
   onSetCategory: (category: string) => void
   hasCategory: boolean
+  isLoadingMessages?: boolean // hides chips during message fetch gap
 }
 
-const CATEGORIES = [
-  { label: "💪 Fitness", value: "Fitness" },
-  { label: "💻 Tech", value: "Tech" },
-  { label: "💰 Finance", value: "Finance" },
-]
+const CATEGORY_EMOJI: Record<string, string> = {
+  fitness: "💪",
+  tech: "💻",
+  finance: "💰",
+  health: "🏥",
+  education: "📚",
+  travel: "✈️",
+  food: "🍔",
+  sports: "⚽",
+  music: "🎵",
+  movies: "🎬",
+  science: "🔬",
+  business: "💼",
+  art: "🎨",
+  gaming: "🎮",
+  news: "📰",
+  cooking: "🍳",
+  history: "📜",
+}
 
-export default function ChatInput({ onSend, onSetCategory, hasCategory }: Props) {
+function getCategoryEmoji(category: string): string {
+  return CATEGORY_EMOJI[category.toLowerCase()] ?? "💬"
+}
+
+export default function ChatInput({
+  onSend,
+  onSetCategory,
+  hasCategory,
+  isLoadingMessages = false,
+}: Props) {
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
+  const [categories, setCategories] = useState<string[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auto-grow textarea
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await api.get<string[]>("/api/conversations/categories")
+        if (res.data && res.data.length > 0) {
+          setCategories(res.data)
+        } else {
+          setCategories(["Fitness", "Tech", "Finance"])
+        }
+      } catch {
+        setCategories(["Fitness", "Tech", "Finance"])
+      }
+    }
+    fetchCategories()
+  }, [])
+
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
@@ -35,7 +76,6 @@ export default function ChatInput({ onSend, onSetCategory, hasCategory }: Props)
     setSending(true)
     setInput("")
 
-    // Reset height
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
     }
@@ -49,41 +89,48 @@ export default function ChatInput({ onSend, onSetCategory, hasCategory }: Props)
       onSend(trimmed)
     }
 
-    // Brief visual feedback on send button
     await new Promise((r) => setTimeout(r, 300))
     setSending(false)
     textareaRef.current?.focus()
   }
 
+  const handleTextareaClick = () => {
+    textareaRef.current?.focus()
+  }
+
   const canSend = input.trim().length > 0
+
+  // Show chips only when:
+  // 1. Category not yet confirmed
+  // 2. Messages have finished loading (avoids false-positive flash on switch)
+  // 3. Chip list is populated
+  const showChips = !hasCategory && !isLoadingMessages && categories.length > 0
 
   return (
     <div className="border-t bg-background/80 backdrop-blur-sm p-4 shrink-0">
       <div className="max-w-3xl mx-auto flex flex-col gap-3">
 
-        {/* Category chips */}
-        {!hasCategory && (
+        {showChips && (
           <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <span className="text-xs text-muted-foreground self-center">
               Choose a topic:
             </span>
-            {CATEGORIES.map((cat) => (
+            {categories.map((cat) => (
               <button
-                key={cat.value}
-                onClick={() => onSetCategory(cat.value)}
+                key={cat}
+                onClick={() => onSetCategory(cat)}
                 className={cn(
                   "px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200",
                   "bg-muted/60 border-border hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-sm",
                   "active:scale-95"
                 )}
               >
-                {cat.label}
+                {getCategoryEmoji(cat)} {cat}
               </button>
             ))}
           </div>
         )}
 
-        {/* Input row */}
         <div
           className={cn(
             "flex items-end gap-2 rounded-2xl border bg-card px-4 py-2.5 shadow-sm transition-all duration-200",
@@ -94,12 +141,19 @@ export default function ChatInput({ onSend, onSetCategory, hasCategory }: Props)
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onClick={handleTextareaClick}
             placeholder={
-              !hasCategory
-                ? "Type a category or pick one above…"
-                : "Ask anything…"
+              isLoadingMessages
+                ? "Loading…"
+                : !hasCategory
+                  ? "Type a category or pick one above…"
+                  : "Ask anything…"
             }
             rows={1}
+            inputMode="text"
+            autoComplete="off"
+            autoCorrect="on"
+            spellCheck={true}
             className={cn(
               "flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground/60",
               "min-h-[24px] max-h-[160px] py-0.5 leading-relaxed"
@@ -115,10 +169,10 @@ export default function ChatInput({ onSend, onSetCategory, hasCategory }: Props)
           <Button
             size="icon"
             onClick={handleSend}
-            disabled={!canSend || sending}
+            disabled={!canSend || sending || isLoadingMessages}
             className={cn(
               "shrink-0 rounded-xl h-8 w-8 transition-all duration-200",
-              canSend
+              canSend && !isLoadingMessages
                 ? "opacity-100 scale-100"
                 : "opacity-40 scale-95",
               sending && "animate-pulse"
